@@ -1,9 +1,12 @@
 import os
 import asyncio
 import discord
+from discord.ext.commands import errors
+from discord.ext.commands.context import Context
 
 from dotenv import load_dotenv
 from discord.ext import commands
+from song_queue import init_queue
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
@@ -16,6 +19,14 @@ class MrBeat(commands.Bot):
         intents.members = True
         intents.message_content = True
         super().__init__(command_prefix='-', intents=intents)
+
+    async def on_ready(self):
+        await init_queue(self)
+        print("Bot ready ... ")
+
+    async def on_command_error(self, context, exception):
+        print(context.message)
+        print(str(exception))
 
 async def main():
     bot = MrBeat()

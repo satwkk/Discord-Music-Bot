@@ -45,8 +45,6 @@ class SpotifyPlaylistPlayer(Player):
         for item in playlist['items']:
             track = item['track']
             
-            if not track: return None
-            
             song, artist = track['name'], \
             ', '.join(artist['name']
                 .encode('ascii', 'ignore')

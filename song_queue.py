@@ -2,9 +2,9 @@ from typing import Union
 
 global_queue = dict()
 
-def init_queue(guilds_ids):
-    for guild_id in guilds_ids:
-        global_queue[guild_id] = list()
+async def init_queue(bot):
+    async for guild in bot.fetch_guilds():
+        global_queue[guild.id] = list()
 
 def get_guild_queue(guild_id):
     return global_queue[guild_id] 
@@ -12,12 +12,12 @@ def get_guild_queue(guild_id):
 def add_to_queue(guild_id, item: Union[str, dict[str, str]]):
     queue = get_guild_queue(guild_id)
     if isinstance(item, str): 
-        queue[guild_id].append(item)
+        queue.append(item)
     else:
         for song, author in item.items():
-            queue[guild_id].append(f'{song} - {author}')
+            queue.append(f'{song} - {author}')
 
-def enqueue_song(guild_id):
+def dequeue_song(guild_id):
     queue = get_guild_queue(guild_id)
     return queue.pop(0)
 
