@@ -1,14 +1,15 @@
 # Module imports
-import utils
 import discord
+from cache import cache
 from urllib import parse
 from discord.ext import commands
 
 # Queue imports
-from song_queue import add_to_queue, get_guild_queue, dequeue_song, clear_queue
+from song_queue import enqueue_song, get_guild_queue, dequeue_song, clear_queue
 
 # TODO: Only debug remove later
 from song_queue import global_queue
+from cache import cache_track
 
 # Importing all the extractors
 from extractors.base_player import Player
@@ -50,24 +51,28 @@ class Music(commands.Cog):
     def _is_vc_active(vc): return vc._is_playing() or vc._is_paused()
     def _is_playing(vc): return vc._is_playing()
     def _is_paused(vc): return vc._is_paused()
-    
-    async def _play(self, ctx, keyword):
-        track = await get_extractor(keyword).extract_track(keyword)
+    def _is_playlist(self, track): return isinstance(track, dict)
 
+    @cache_track
+    async def get_track_from_extractor(self, ctx, keyword):
+        track = await get_extractor(keyword).extract_track(keyword)
         # If the data extactor is a dict, or a list of songs
         # then it is a playlist, hence add all the songs to the queue
-        if isinstance(track, dict):
-            add_to_queue(ctx.guild.id, track)
+        if self._is_playlist(track):
+            enqueue_song(ctx.guild.id, track)
             # The data dequeued is still just a formated string, extracting meta data from the default player API.
             track = await DefaultPlayer().extract_track(dequeue_song(ctx.guild.id))
+        return track
 
+    async def play_song(self, ctx, keyword):
+        track = await self.get_track_from_extractor(ctx, keyword)
         audio_stream = await _convert_track_to_audio_stream(track)
         await ctx.send(f'Playing ▶️ **{track.title}**')
-        ctx.voice_client.play(audio_stream, after=lambda e=None: self._play_next_song(ctx))
+        ctx.voice_client.play(audio_stream, after=lambda e=None: self.play_next_song(ctx))
         
-    def _play_next_song(self, ctx):
+    def play_next_song(self, ctx):
         track = dequeue_song(ctx.guild.id)
-        self.bot.loop.create_task(self._play(ctx, track))
+        self.bot.loop.create_task(self.play_song(ctx, track))
         
     @commands.command()
     async def play(self, ctx, *, keyword):
@@ -75,10 +80,10 @@ class Music(commands.Cog):
             await ctx.author.voice.channel.connect()
             
         if ctx.voice_client.is_playing():
-            add_to_queue(ctx.guild.id, keyword)
+            enqueue_song(ctx.guild.id, keyword)
             return await ctx.send(f'Added **{keyword}** to queue.')
         
-        self.bot.loop.create_task(self._play(ctx, keyword))
+        self.bot.loop.create_task(self.play_song(ctx, keyword))
     
     @commands.command()
     async def skip(self, ctx):
@@ -92,6 +97,10 @@ class Music(commands.Cog):
     async def resume(self, ctx):
         if self._is_paused(ctx.voice_client): ctx.voice_client.resume()
     
+    @commands.command()
+    async def flush(self, ctx):
+        clear_queue(ctx.guild.id)
+
     @commands.command()
     async def list_queue(self, ctx):
         temp_str = str()
@@ -113,6 +122,7 @@ class Music(commands.Cog):
     @commands.command()
     async def debug(self, ctx):
         print(global_queue)
+        print(cache)
 
 async def setup(bot):
     await bot.add_cog(Music(bot))

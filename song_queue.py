@@ -9,7 +9,7 @@ async def init_queue(bot):
 def get_guild_queue(guild_id):
     return global_queue[guild_id] 
 
-def add_to_queue(guild_id, item: Union[str, dict[str, str]]):
+def enqueue_song(guild_id, item: Union[str, dict[str, str]]):
     queue = get_guild_queue(guild_id)
     if isinstance(item, str): 
         queue.append(item)

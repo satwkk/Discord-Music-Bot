@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from hashlib import md5
 
 @dataclass
 class Track:
@@ -9,7 +10,7 @@ class Track:
     
     def __repr__(self) -> str:
         return f'{self.title} from author {self.author}'
-    
+
     @property
     def playable(self):
         if self.stream and self.author and self.thumbnail and self.title:
