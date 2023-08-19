@@ -8,7 +8,6 @@ from discord.message import Message
 from dotenv import load_dotenv
 from discord.ext import commands
 from song_queue import init_queue
-from cache import init_cache
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
@@ -25,7 +24,6 @@ class MrBeat(commands.Bot):
     async def on_ready(self):
         # Initializing global systems on ready
         await init_queue(self)
-        await init_cache(self)
         print("Bot ready ... ")
 
     async def on_command_error(self, context, exception):
