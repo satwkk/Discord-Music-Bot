@@ -147,6 +147,14 @@ class Music(commands.Cog):
         print(global_queue)
         print(cache)
 
+    @commands.command()
+    async def chat(self, ctx, *, message):
+        pass
+
+    @commands.command()
+    async def recommend_movie(self, ctx, *, keywords): 
+        pass
+
 async def setup(bot):
     await bot.add_cog(Music(bot))
     
