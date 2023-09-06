@@ -42,7 +42,7 @@ def get_extractor(keyword):
 
 # Converts an opus audio to audio stream that can be streamed on discord
 async def _convert_track_to_audio_stream(track):
-    audio_stream = await discord.FFmpegOpusAudio.from_probe(track.stream, **FFMPEG_OPTIONS)
+    audio_stream = await discord.FFmpegOpusAudio.from_probe(track.stream_url, **FFMPEG_OPTIONS)
     return audio_stream
 
 def validate_command_invoker(ctx):
@@ -56,10 +56,13 @@ def author_callable(func):
         func(*args, **kwargs)
     return wrapper
 
+from player import Player, PlayerManager
+from discord.ext.commands import Bot
 # Main music COG that manages all audio related commands
 class Music(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: Bot):
         self.bot = bot
+        self.player_manager = PlayerManager()
 
     def _is_playing(self, vc): return vc.is_playing()
     def _is_paused(self, vc): return vc.is_paused()
@@ -67,8 +70,8 @@ class Music(commands.Cog):
     def _is_playlist(self, track): return isinstance(track, dict)
     def _is_joined_to_vc(self, vc): return vc is not None
     def _is_in_same_voice_channel_as_invoker(self, vclient, invoker): return invoker.voice.channel == vclient.channel
-
-    @cache_track
+    
+    # @cache_track
     async def get_track_from_extractor(self, ctx, keyword):
         track = await get_extractor(keyword).extract_track(keyword)
         # If the data extactor is a dict, or a list of songs
@@ -79,38 +82,20 @@ class Music(commands.Cog):
             track = await DefaultPlayer().extract_track(dequeue_song(ctx.guild.id))
         return track
 
-    async def play_song(self, ctx, keyword):
-        track = await self.get_track_from_extractor(ctx, keyword)
-        audio_stream = await _convert_track_to_audio_stream(track)
-        
-        track_embed = Embed(title='Playing ▶️', colour=discord.Colour.random())
-        track_embed.add_field(name=f'{track.title}', value='\u200b')
-        track_embed.set_thumbnail(url=track.thumbnail)
-        await ctx.send(embed=track_embed)
-        
-        # await ctx.send(f'Playing ▶️ **{track.title}**')
-        ctx.voice_client.play(audio_stream, after=lambda e=None: self.play_next_song(ctx))
-        
-    def play_next_song(self, ctx):
-        track = dequeue_song(ctx.guild.id)
-        self.bot.loop.create_task(self.play_song(ctx, track))
-        
     @commands.command()
     @commands.check(validate_command_invoker)
     async def play(self, ctx, *, keyword):
         if not ctx.voice_client:
             await ctx.author.voice.channel.connect()
-            
-        # Temporary check for url, will update it later
-        if (ctx.voice_client.is_playing() or len(get_guild_queue(ctx.guild.id)) > 0) and not keyword.startswith('http'):
-            enqueue_song(ctx.guild.id, keyword)
-            return await ctx.send(f'Added **{keyword}** to queue.')
         
-        self.bot.loop.create_task(self.play_song(ctx, keyword))
+        track = await self.get_track_from_extractor(ctx, keyword)
+        audio_stream = await _convert_track_to_audio_stream(track)
+        self.player_manager.get_guild_player(ctx.guild.id).add_track(ctx, [track, audio_stream])
     
     @commands.command()
     async def skip(self, ctx):
-        ctx.voice_client.stop()
+        self.player.skip(ctx)
+        # ctx.voice_client.stop()
     
     @commands.command()
     async def pause(self, ctx):
@@ -126,8 +111,9 @@ class Music(commands.Cog):
 
     @commands.command()
     async def list_queue(self, ctx):
+        queue = self.player_manager.get_player_queue_list(ctx.guild.id)
         temp_str = str()
-        for idx, song in enumerate(get_guild_queue(ctx.guild.id)):
+        for idx, song in enumerate(queue):
             temp_str += f'**{idx+1}. {song}**\n'
         await ctx.send(temp_str)
         
@@ -144,8 +130,9 @@ class Music(commands.Cog):
     
     @commands.command()
     async def debug(self, ctx):
-        print(global_queue)
-        print(cache)
+        # print(global_queue)
+        # print(cache)
+        self.player_manager.print_players_DEBUG()
 
     @commands.command()
     async def chat(self, ctx, *, message):

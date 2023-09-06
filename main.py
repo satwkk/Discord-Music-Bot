@@ -1,6 +1,7 @@
-import os
 import asyncio
 import discord
+import os
+
 from discord.ext.commands import errors
 from discord.ext.commands.context import Context
 from discord.message import Message
@@ -14,17 +15,21 @@ TOKEN = os.getenv("TOKEN")
 
 cogs = ['music']
 
+from player import PlayerManager, players, Player
 class MrBeat(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
-        super().__init__(command_prefix='-', intents=intents)
+        super().__init__(command_prefix='.', intents=intents)
 
     async def on_ready(self):
         # Initializing global systems on ready
-        await init_queue(self)
+        # await init_queue(self)
         print("Bot ready ... ")
+        # PlayerManager.set_guild_players(self, await self.fetch_guilds())
+        async for guild in self.fetch_guilds():
+            players[guild.id] = Player(self)
 
     async def on_command_error(self, context, exception):
         print(context.message)
