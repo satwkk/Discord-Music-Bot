@@ -2,20 +2,15 @@ import asyncio
 import discord
 import os
 
-from discord.ext.commands import errors
-from discord.ext.commands.context import Context
-from discord.message import Message
-
 from dotenv import load_dotenv
 from discord.ext import commands
-from song_queue import init_queue
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
 
 cogs = ['music']
 
-from player import PlayerManager, players, Player
+from player import players, MusicPlayer
 class MrBeat(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
@@ -25,11 +20,11 @@ class MrBeat(commands.Bot):
 
     async def on_ready(self):
         # Initializing global systems on ready
-        # await init_queue(self)
         print("Bot ready ... ")
-        # PlayerManager.set_guild_players(self, await self.fetch_guilds())
+        
+        # Initializing players for all guilds
         async for guild in self.fetch_guilds():
-            players[guild.id] = Player(self)
+            players[guild.id] = MusicPlayer(self)
 
     async def on_command_error(self, context, exception):
         print(context.message)

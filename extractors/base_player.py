@@ -22,5 +22,5 @@ class Player(ABC):
         return info
     
     @abstractmethod
-    async def extract_track(self, keyword):
+    def extract_track(self, keyword):
         print ('Base class extract_track called !!!')

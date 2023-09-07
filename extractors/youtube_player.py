@@ -8,7 +8,7 @@ class YoutubeTrackPlayer(Player):
     def __init__(self):
         super().__init__()
         
-    async def extract_track(self, url):
+    def extract_track(self, url):
         result = pytube.YouTube(url)
         search_info = self.ytdl_search(result.video_id)
         return Track(
@@ -23,5 +23,5 @@ class YoutubePlaylistPlayer(Player):
     def __init__(self):
         super().__init__()
         
-    async def extract_track(self, keyword):
+    def extract_track(self, keyword):
         ...
