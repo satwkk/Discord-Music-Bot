@@ -8,6 +8,5 @@ def get_music_embed(track):
     return music_embed
 
 def get_queue_embed(keyword):
-    queue_embed = Embed(title='Queued', colour=Colour.red())
-    queue_embed.add_field(name=f'{keyword} added to the queue', value='\u200b')
+    queue_embed = Embed(title=f'{keyword} added to the queue', colour=Colour.red())
     return queue_embed

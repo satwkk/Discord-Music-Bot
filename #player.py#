@@ -12,9 +12,9 @@ from discord import Guild, VoiceClient, FFmpegPCMAudio
 from extractors.base_player import Player
 from extractors.default_player import DefaultPlayer
 from extractors.youtube_player import YoutubeTrackPlayer
-from extractors.spotify_player import SpotifyTrackPlayer, SpotifyPlaylistPlayer, SpotifyAlbumPlayer
+from extractors.spotify_player import Spotifytrackplayer, Spotifyplaylistplayer, Spotifyalbumplayer
 
-FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
+Ffmpeg_Options = {'Before_Options': '-Reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
 
 class PlayerState(Enum):
     IDLE=0
@@ -43,13 +43,13 @@ def get_extractor(keyword: str) -> Player:
 # NOTE: Do not create instance of this class separately, instead handle it through the PlayerManager class.
 from discord.ext.commands import Context
 class MusicPlayer:
-    def __init__(self, bot: Bot):
+    def __init__(self, ctx: Context):
         self.__queue = list()
         self.sleep_time = 5
         self.state = PlayerState.IDLE
-        self.bot = bot
-        self.ctx: Context = None
-        self.voice_client: VoiceClient = None
+        self.ctx = ctx
+        self.bot: Bot = ctx.bot
+        self.voice_client: VoiceClient = ctx.voice_client
         self.current_track: Track = None
 
         # Player Loop is multithreaded, each guild will have separate thread
@@ -67,7 +67,7 @@ class MusicPlayer:
         return FFmpegPCMAudio(self.current_track.stream_url, **FFMPEG_OPTIONS)
     
     def add_track(self, ctx: Context, keyword: str) -> None:
-        self.ctx, self.voice_client = ctx, ctx.voice_client
+        self.ctx, self.bot, self.voice_client = ctx, ctx.bot, ctx.voice_client
         self.__queue.append(keyword)
         
     def reset_state(self) -> None:
@@ -86,27 +86,24 @@ class MusicPlayer:
         if self.voice_client is not None: self.voice_client.resume()
     
     def leave(self) -> None:
-        self.queue.clear()
         self.bot.loop.create_task(self.voice_client.disconnect())
-        self.loop_thread.terminate()
 
-    def loop(self) -> None:
-        while not self.bot.is_closed():
-            if len(self.__queue) > 0 and self.state == PlayerState.IDLE:
-                print("True") # DEBUG
-                try:
+    def loop(self):
+        try:
+            while not self.bot.is_closed():
+                if len(self.__queue) > 0 and self.state == PlayerState.IDLE:
+                    print("True")
                     audio_stream = self.dequeue_track()
                     self.voice_client.play(audio_stream, after=lambda e: self.reset_state())
                     self.bot.loop.create_task(self.ctx.send(embed=get_music_embed(self.current_track)))
                     self.state = PlayerState.PLAYING
-                except Exception as e:
-                    print(str(e))
-                    continue
-            else:
-                # Sleep for sleep_time seconds
-                print("False") # DEBUG
-                sleep(self.sleep_time)
-
+                else:
+                    # Sleep for sleep_time seconds
+                    print("False")
+                    sleep(self.sleep_time)
+        finally:
+            print('Exiting player loop bye bye')
+            
 players: Dict[int, MusicPlayer] = dict()
 
 # Manager class for all MusicPlayers. It acts as an proxy between client commands and MusicPlayer class.
@@ -137,7 +134,9 @@ class MusicPlayerManager:
         players[id].skip_track()
         
     def leave_guild(self, id: int) -> None:
+        self.clear_guild_queue(id)
         self.get_guild_player(id).leave()
+        self.get_guild_player(id).loop_thread.terminate()
         self.remove_guild_player(id)
         
     def pause_guild_track(self, id: int) -> None:

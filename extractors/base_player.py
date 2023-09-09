@@ -1,12 +1,14 @@
-import youtube_dl
+from youtube_dl import YoutubeDL
 
+from models.track import Track
+from typing import Union, Dict
 from abc import ABC, abstractmethod
 
 YOUTUBEDL_PARAMS = {'format': 'bestaudio/best', 'noplaylist':'True', 'quiet': 'True', 'ignoreerrors': 'True'}
 YTDL_SEARCH_QUERY = "https://www.youtube.com/watch?v={}"
 
 # Initializing youtube_dl client
-ytdl = youtube_dl.YoutubeDL(params=YOUTUBEDL_PARAMS, auto_init=True)
+ytdl = YoutubeDL(params=YOUTUBEDL_PARAMS, auto_init=True)
 
 # Base class
 # NOTE: Should not be instantiated
@@ -22,5 +24,5 @@ class Player(ABC):
         return info
     
     @abstractmethod
-    def extract_track(self, keyword):
+    def extract_track(self, keyword) -> Union[Track, Dict[str, str]]:
         print ('Base class extract_track called !!!')

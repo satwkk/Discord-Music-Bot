@@ -20,11 +20,16 @@ class MrBeat(commands.Bot):
 
     async def on_ready(self):
         # Initializing global systems on ready
-        print("Bot ready ... ")
+        print(f'Bot Latency: {self.latency}')
         
         # Initializing players for all guilds
-        async for guild in self.fetch_guilds():
-            players[guild.id] = MusicPlayer(self)
+        # print('Existing Guilds')
+        # print('===============')
+        # async for guild in self.fetch_guilds():
+        #     print(f'[{guild.id}] => {guild.name}')
+        #     players[guild.id] = MusicPlayer(self)
+
+        print("Bot ready ... ")
 
     async def on_command_error(self, context, exception):
         print(context.message)

@@ -1,18 +1,8 @@
-# Module imports
-import discord
-from cache import cache
-from urllib import parse
-from discord import Embed
-from discord import Colour
 from discord.ext import commands
 from discord.ext.commands import Bot
-from player import Player, MusicPlayerManager
-
-# Queue imports
-from song_queue import enqueue_song, get_guild_queue, dequeue_song, clear_queue
-
-# TODO: Only debug remove later
-from cache import cache_track
+from player import MusicPlayerManager
+from embeds import get_queue_embed
+from player import players, MusicPlayer
 
 def validate_command_invoker(ctx):
     return ctx.author.voice.channel is not None
@@ -31,18 +21,20 @@ class Music(commands.Cog):
         self.bot = bot
         self.player_manager = MusicPlayerManager()
 
-    def _is_playing(self, vc): return vc.is_playing()
-    def _is_paused(self, vc): return vc.is_paused()
-    def _is_vc_active(self, vc): return self._is_playing(vc) or self._is_paused(vc)
-    def _is_playlist(self, track): return isinstance(track, dict)
-
     @commands.command()
     @commands.check(validate_command_invoker)
     async def play(self, ctx, *, keyword):
         if not ctx.voice_client:
             await ctx.author.voice.channel.connect()
+        await ctx.send(embed=get_queue_embed(keyword))
             
-        self.player_manager.get_guild_player(ctx.guild.id).add_track(ctx, keyword)
+        if ctx.guild.id not in players:
+            print('No guild player, creating one..')
+            players[ctx.guild.id] = MusicPlayer(self.bot)
+
+        print('Guild player found, getting the player...')
+        guild_player = players[ctx.guild.id]
+        guild_player.add_track(ctx, keyword)
     
     @commands.command()
     async def skip(self, ctx):
@@ -50,33 +42,30 @@ class Music(commands.Cog):
     
     @commands.command()
     async def pause(self, ctx):
-        if self._is_playing(ctx.voice_client): ctx.voice_client.pause()
+        self.player_manager.pause_guild_track(ctx.guild.id)
     
     @commands.command()
     async def resume(self, ctx):
-        if self._is_paused(ctx.voice_client): ctx.voice_client.resume()
+        self.player_manager.resume_guild_track(ctx.guild.id)
     
     @commands.command()
     async def flush(self, ctx):
-        self.player_manager.clear_guild_queue_list(ctx.guild.id)
+        self.player_manager.clear_guild_queue(ctx.guild.id)
 
     @commands.command()
     async def list_queue(self, ctx):
-        queue = self.player_manager.get_guild_queue_list(ctx.guild.id)
+        queue = self.player_manager.get_guild_queue(ctx.guild.id)
         temp_str = str()
         for idx, song in enumerate(queue):
-            temp_str += f'**{idx+1}. {song[0]}**\n'
+            temp_str += f'**{idx+1}. {song}**\n'
         await ctx.send(temp_str)
         
     @commands.command()
     async def leave(self, ctx):
-        self.player_manager.clear_guild_queue_list(ctx.guild.id)
-        await ctx.voice_client.disconnect()
+        self.player_manager.leave_guild(ctx.guild.id)
         
     @commands.command()
     async def debug(self, ctx):
-        # print(global_queue)
-        # print(cache)
         self.player_manager.print_players_DEBUG()
 
     @commands.command()
