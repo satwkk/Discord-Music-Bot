@@ -42,15 +42,26 @@ def get_extractor(keyword: str) -> Player:
 # Main player Loop class which handles all music related functionalities.
 # NOTE: Do not create instance of this class separately, instead handle it through the PlayerManager class.
 from discord.ext.commands import Context
+
+class PlayerTrack:
+    def __init__(self, keyword: str, track: Track = None, audio_stream: FFmpegPCMAudio = None):
+        self.keyword = keyword
+        self.track = track
+        self.audio_stream = audio_stream
+        
+    def playable(self) -> bool:
+        return self.audio_stream is not None and self.track is not None
+        
 class MusicPlayer:
     def __init__(self, bot: Bot):
         self.__queue = list()
         self.sleep_time = 5
-        self.state = PlayerState.IDLE
+        self._state = PlayerState.IDLE
         self.bot = bot
+        self.repeat_current_track = False
         self.ctx: Context = None
         self.voice_client: VoiceClient = None
-        self.current_track: Track = None
+        self.current_track_2: PlayerTrack = None
 
         # Player Loop is multithreaded, each guild will have separate thread
         self.loop_thread = KThread(target=self.loop, name="Main Loop Thread")
@@ -60,18 +71,27 @@ class MusicPlayer:
     def queue(self):
         return self.__queue
     
-    def dequeue_track(self) -> FFmpegPCMAudio:
+    def dequeue_track(self) -> PlayerTrack:
         print('Dequeing the first song')
-        requested_keyword = self.__queue.pop(0)
-        self.current_track = get_extractor(requested_keyword).extract_track(requested_keyword)
-        return FFmpegPCMAudio(self.current_track.stream_url, **FFMPEG_OPTIONS)
+        self.current_track_2 = self.__queue.pop(0)
+        self.current_track_2.track = get_extractor(self.current_track_2.keyword).extract_track(self.current_track_2.keyword)
+        self.current_track_2.audio_stream = FFmpegPCMAudio(self.current_track_2.track.stream_url, **FFMPEG_OPTIONS)
+        return self.current_track_2
     
     def add_track(self, ctx: Context, keyword: str) -> None:
         self.ctx, self.voice_client = ctx, ctx.voice_client
-        self.__queue.append(keyword)
+        self.__queue.append(PlayerTrack(keyword))
+
+    def queue_repeat_request(self) -> None:
+        if self.current_track_2 is not None:
+            self.__queue.append(self.current_track_2)
+            return True
+        return False
         
+    # Reset any state variables here
     def reset_state(self) -> None:
-        self.state = PlayerState.IDLE
+        self.repeat_current_track = False
+        self._state = PlayerState.IDLE
         
     def clear_queue(self) -> None:
         self.__queue.clear()
@@ -85,6 +105,10 @@ class MusicPlayer:
     def resume_track(self) -> None:
         if self.voice_client is not None: self.voice_client.resume()
     
+    def cleanup(self) -> None:
+        self.voice_client = None
+        self.loop_thread.terminate()
+
     def leave(self) -> None:
         self.queue.clear()
         self.bot.loop.create_task(self.voice_client.disconnect())
@@ -92,19 +116,16 @@ class MusicPlayer:
 
     def loop(self) -> None:
         while not self.bot.is_closed():
-            if len(self.__queue) > 0 and self.state == PlayerState.IDLE:
-                print("True") # DEBUG
+            if len(self.__queue) > 0 and self._state == PlayerState.IDLE:# or self.repeat
                 try:
-                    audio_stream = self.dequeue_track()
-                    self.voice_client.play(audio_stream, after=lambda e: self.reset_state())
-                    self.bot.loop.create_task(self.ctx.send(embed=get_music_embed(self.current_track)))
-                    self.state = PlayerState.PLAYING
+                    requested_track: PlayerTrack = self.dequeue_track()
+                    self.voice_client.play(requested_track.audio_stream, after=lambda e: self.reset_state())
+                    self.bot.loop.create_task(self.ctx.send(embed=get_music_embed(requested_track.track)))
+                    self._state = PlayerState.PLAYING
                 except Exception as e:
                     print(str(e))
                     continue
             else:
-                # Sleep for sleep_time seconds
-                print("False") # DEBUG
                 sleep(self.sleep_time)
 
 players: Dict[int, MusicPlayer] = dict()
@@ -127,7 +148,7 @@ class MusicPlayerManager:
     def print_players_DEBUG(self) -> None:
         print(players)
             
-    def get_guild_queue(self, id: int) -> List[Track]:
+    def get_guild_queue(self, id: int) -> List[PlayerTrack]:
         return players[id].queue
     
     def clear_guild_queue(self, id: int) -> None:
@@ -145,4 +166,9 @@ class MusicPlayerManager:
         
     def resume_guild_track(self, id: int) -> None:
         self.get_guild_player(id).resume_track()
+        
+    def register_repeat_request(self, id: int) -> None:
+        if self.get_guild_player(id).queue_repeat_request():
+            return True
+        return False
         

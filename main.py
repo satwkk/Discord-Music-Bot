@@ -16,19 +16,10 @@ class MrBeat(commands.Bot):
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
-        super().__init__(command_prefix='.', intents=intents)
+        super().__init__(command_prefix='-', intents=intents)
 
     async def on_ready(self):
-        # Initializing global systems on ready
         print(f'Bot Latency: {self.latency}')
-        
-        # Initializing players for all guilds
-        # print('Existing Guilds')
-        # print('===============')
-        # async for guild in self.fetch_guilds():
-        #     print(f'[{guild.id}] => {guild.name}')
-        #     players[guild.id] = MusicPlayer(self)
-
         print("Bot ready ... ")
 
     async def on_command_error(self, context, exception):
