@@ -3,7 +3,7 @@ from hashlib import md5
 
 @dataclass
 class Track:
-    stream: str
+    stream_url: str
     author: str
     thumbnail: str
     title: str
@@ -13,6 +13,6 @@ class Track:
 
     @property
     def playable(self):
-        if self.stream and self.author and self.thumbnail and self.title:
+        if self.stream_url and self.author and self.thumbnail and self.title:
             return True
         return False

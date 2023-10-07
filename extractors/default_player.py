@@ -8,7 +8,7 @@ class DefaultPlayer(Player):
     def __init__(self):
         super().__init__()
         
-    async def extract_track(self, keyword):
+    def extract_track(self, keyword):
         search_res = pytube.Search(keyword)
         search_info = self.ytdl_search(search_res.results[0].video_id)
         return Track(

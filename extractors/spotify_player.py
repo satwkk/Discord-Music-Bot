@@ -23,7 +23,7 @@ class SpotifyTrackPlayer(Player):
         song, author = track['name'], ', '.join(artist['name'].encode('ascii', 'ignore').decode('latin-1') for artist in track['artists'])
         return (song, author)
     
-    async def extract_track(self, url):
+    def extract_track(self, url):
         # TEST URL: https://open.spotify.com/track/2ksyzVfU0WJoBpu8otr4pz
         id = utils.get_id(url)
         track = sp_client.track(id)
@@ -32,7 +32,7 @@ class SpotifyTrackPlayer(Player):
             return None
         
         song, author = self.get_track_details(track)
-        track = await DefaultPlayer().extract_track(f'{song} - {author}')
+        track = DefaultPlayer().extract_track(f'{song} - {author}')
         return track
         
 class SpotifyPlaylistPlayer(Player):
@@ -54,7 +54,7 @@ class SpotifyPlaylistPlayer(Player):
             
         return items
         
-    async def extract_track(self, url):
+    def extract_track(self, url):
         playlist = sp_client.playlist_items(utils.get_id(url))
         playlist_items = self.get_playlist_items(playlist)
         return playlist_items
