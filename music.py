@@ -54,6 +54,10 @@ class Music(commands.Cog):
     async def repeat(self, ctx: Context) -> None:
         if self.player_manager.register_repeat_request(ctx.guild.id): await ctx.send('Repeat request has been queued.')
         else: await ctx.send('Play a song to send repeat request.')
+
+    @commands.command()
+    async def reset(self, ctx: Context) -> None:
+        self.player_manager.reset_guild_player(ctx.guild.id)
             
     @commands.command()
     async def flush(self, ctx: Context):

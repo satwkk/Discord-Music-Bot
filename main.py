@@ -1,6 +1,6 @@
+import os
 import asyncio
 import discord
-import os
 
 from dotenv import load_dotenv
 from discord.ext import commands
@@ -10,7 +10,7 @@ TOKEN = os.getenv("TOKEN")
 
 cogs = ['music']
 
-from player import players, MusicPlayer
+
 class MrBeat(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()

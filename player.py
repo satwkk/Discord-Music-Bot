@@ -2,6 +2,7 @@ from enum import Enum
 from time import sleep
 from urllib import parse
 from kthread import KThread
+from threading import Thread
 from typing import List, Dict
 from models.track import Track
 from embeds import get_music_embed
@@ -55,42 +56,47 @@ class PlayerTrack:
 class MusicPlayer:
     def __init__(self, bot: Bot):
         self.__queue = list()
-        self.sleep_time = 5
+        self.sleep_time = 60 * 5
         self._state = PlayerState.IDLE
         self.bot = bot
-        self.repeat_current_track = False
         self.ctx: Context = None
         self.voice_client: VoiceClient = None
-        self.current_track_2: PlayerTrack = None
+        self.current_track: PlayerTrack = None
+        self.dc_task_queued = False
+        self.dc_timer_threshold = 60
 
         # Player Loop is multithreaded, each guild will have separate thread
         self.loop_thread = KThread(target=self.loop, name="Main Loop Thread")
         self.loop_thread.start()
+        
+        self.dc_timer = None
 
     @property
     def queue(self):
         return self.__queue
     
+    def is_connected_and_idle(self) -> bool:
+        return len(self.__queue) == 0 and self.voice_client is not None and self._state == PlayerState.IDLE and not self.dc_task_queued
+    
     def dequeue_track(self) -> PlayerTrack:
         print('Dequeing the first song')
-        self.current_track_2 = self.__queue.pop(0)
-        self.current_track_2.track = get_extractor(self.current_track_2.keyword).extract_track(self.current_track_2.keyword)
-        self.current_track_2.audio_stream = FFmpegPCMAudio(self.current_track_2.track.stream_url, **FFMPEG_OPTIONS)
-        return self.current_track_2
+        self.current_track = self.__queue.pop(0)
+        self.current_track.track = get_extractor(self.current_track.keyword).extract_track(self.current_track.keyword)
+        self.current_track.audio_stream = FFmpegPCMAudio(self.current_track.track.stream_url, **FFMPEG_OPTIONS)
+        return self.current_track
     
     def add_track(self, ctx: Context, keyword: str) -> None:
         self.ctx, self.voice_client = ctx, ctx.voice_client
         self.__queue.append(PlayerTrack(keyword))
 
     def queue_repeat_request(self) -> None:
-        if self.current_track_2 is not None:
-            self.__queue.append(self.current_track_2)
+        if self.current_track is not None:
+            self.__queue.append(self.current_track)
             return True
         return False
         
     # Reset any state variables here
     def reset_state(self) -> None:
-        self.repeat_current_track = False
         self._state = PlayerState.IDLE
         
     def clear_queue(self) -> None:
@@ -113,6 +119,33 @@ class MusicPlayer:
         self.queue.clear()
         self.bot.loop.create_task(self.voice_client.disconnect())
         self.loop_thread.terminate()
+        
+    def start_dc_timer(self) -> None:
+        print('Started DC Timer for guild: ', self.ctx.guild.name)  
+        timer = 0
+        
+        try:
+            while True:
+                print(f'Counting {timer}')
+                
+                # If a song is added between the timer
+                if len(self.__queue) > 0:
+                    self.dc_task_queued = False
+                    self.dc_timer.terminate()
+                    return
+                    
+                # If the timer reaches it's dc threshold disconnect from the guild
+                # TODO: Too many variables being assigned here, find a better approach
+                if timer >= self.dc_timer_threshold:
+                    print('Timer reached, disconnecting from guild {}'.format(self.ctx.guild.name))
+                    self.leave()
+                    del players[self.ctx.guild.id]
+                    self.dc_task_queued = False
+                    return
+                timer += 1
+                sleep(1)
+        except:
+            print('[DEBUG] Song was queued in between, breaking out of thread')
 
     def loop(self) -> None:
         while not self.bot.is_closed():
@@ -126,6 +159,10 @@ class MusicPlayer:
                     print(str(e))
                     continue
             else:
+                if self.is_connected_and_idle():
+                    self.dc_task_queued = True
+                    self.dc_timer = KThread(target=self.start_dc_timer)
+                    self.dc_timer.start()
                 sleep(self.sleep_time)
 
 players: Dict[int, MusicPlayer] = dict()
@@ -150,7 +187,7 @@ class MusicPlayerManager:
             
     def get_guild_queue(self, id: int) -> List[PlayerTrack]:
         return players[id].queue
-    
+
     def clear_guild_queue(self, id: int) -> None:
         players[id].clear_queue()
         
@@ -166,6 +203,13 @@ class MusicPlayerManager:
         
     def resume_guild_track(self, id: int) -> None:
         self.get_guild_player(id).resume_track()
+        
+    def reset_guild_player(self, id: int) -> None:
+        guild_player = self.get_guild_player(id)
+        if guild_player.voice_client: 
+            guild_player.voice_client.stop()
+        guild_player.clear_queue()
+        guild_player.reset_state()
         
     def register_repeat_request(self, id: int) -> None:
         if self.get_guild_player(id).queue_repeat_request():
