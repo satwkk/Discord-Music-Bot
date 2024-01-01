@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from hashlib import md5
+import pickle
+from db import handle
 
 @dataclass
 class Track:
@@ -16,3 +18,4 @@ class Track:
         if self.stream_url and self.author and self.thumbnail and self.title:
             return True
         return False
+        

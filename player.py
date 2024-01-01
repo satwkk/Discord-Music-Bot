@@ -43,6 +43,7 @@ def get_extractor(keyword: str) -> Player:
 # Main player Loop class which handles all music related functionalities.
 # NOTE: Do not create instance of this class separately, instead handle it through the PlayerManager class.
 from discord.ext.commands import Context
+import pickle
 
 class PlayerTrack:
     def __init__(self, keyword: str, track: Track = None, audio_stream: FFmpegPCMAudio = None):
@@ -52,18 +53,21 @@ class PlayerTrack:
         
     def playable(self) -> bool:
         return self.audio_stream is not None and self.track is not None
+
+    def get_serialized_format(self):
+        return pickle.loads(self)
         
 class MusicPlayer:
     def __init__(self, bot: Bot):
         self.__queue = list()
-        self.sleep_time = 60 * 5
+        self.sleep_time = 3
         self._state = PlayerState.IDLE
         self.bot = bot
         self.ctx: Context = None
         self.voice_client: VoiceClient = None
         self.current_track: PlayerTrack = None
         self.dc_task_queued = False
-        self.dc_timer_threshold = 60
+        self.dc_timer_threshold = 60 * 5
 
         # Player Loop is multithreaded, each guild will have separate thread
         self.loop_thread = KThread(target=self.loop, name="Main Loop Thread")
@@ -77,11 +81,33 @@ class MusicPlayer:
     
     def is_connected_and_idle(self) -> bool:
         return len(self.__queue) == 0 and self.voice_client is not None and self._state == PlayerState.IDLE and not self.dc_task_queued
+
+    def has_song_in_queue(self):
+        return len(self.queue) > 0
     
     def dequeue_track(self) -> PlayerTrack:
         print('Dequeing the first song')
-        self.current_track = self.__queue.pop(0)
-        self.current_track.track = get_extractor(self.current_track.keyword).extract_track(self.current_track.keyword)
+        self.current_track = self.queue.pop(0)
+
+        # Get the correct extractor from the factory
+        extractor = get_extractor(self.current_track.keyword)
+
+        # Extract the contents from appropriate API
+        extracted_data = extractor.extract_track(self.current_track.keyword)
+
+        # If the data returned is a playlist then iterate over all the data and add them into the queue
+        if extractor.is_playlist(extracted_data):
+            for artist, track in extracted_data.items():
+                self.queue.append(PlayerTrack(f'{track} - {artist}'))
+            
+            # After adding all the data to queue take the first one and extract information about it
+            self.current_track = self.queue.pop(0)
+            self.current_track.track = get_extractor(self.current_track.keyword).extract_track(self.current_track.keyword)
+        
+        # Else if the data returned is a track simply assign the value back to self.current_track and return it
+        else:
+            self.current_track.track = extracted_data
+
         self.current_track.audio_stream = FFmpegPCMAudio(self.current_track.track.stream_url, **FFMPEG_OPTIONS)
         return self.current_track
     
@@ -149,7 +175,7 @@ class MusicPlayer:
 
     def loop(self) -> None:
         while not self.bot.is_closed():
-            if len(self.__queue) > 0 and self._state == PlayerState.IDLE:# or self.repeat
+            if self.has_song_in_queue() and self._state == PlayerState.IDLE:
                 try:
                     requested_track: PlayerTrack = self.dequeue_track()
                     self.voice_client.play(requested_track.audio_stream, after=lambda e: self.reset_state())
@@ -159,10 +185,13 @@ class MusicPlayer:
                     print(str(e))
                     continue
             else:
+                '''
+                # TODO: The auto disconnect timer has some bugs
                 if self.is_connected_and_idle():
                     self.dc_task_queued = True
                     self.dc_timer = KThread(target=self.start_dc_timer)
                     self.dc_timer.start()
+                '''
                 sleep(self.sleep_time)
 
 players: Dict[int, MusicPlayer] = dict()
@@ -171,6 +200,9 @@ players: Dict[int, MusicPlayer] = dict()
 # Do not create instances or modify music players by yourself, use this class to get your specific guild player. 
 class MusicPlayerManager:
     def __init__(self) -> None: ...
+
+    def get_current_song(self, id: int) -> PlayerTrack:
+        return self.get_guild_player(id).current_track
 
     def contains_guild_player(self, id: int) -> bool:
         return True if id in players else False
@@ -215,4 +247,9 @@ class MusicPlayerManager:
         if self.get_guild_player(id).queue_repeat_request():
             return True
         return False
-        
+
+    def is_guild_player_registered(self, id: int) -> bool:
+        return id in players
+
+    def register_guild_player(self, id: int, player) -> bool:
+        players[id] = player

@@ -4,6 +4,7 @@ from player import MusicPlayerManager
 from embeds import get_queue_embed
 from player import players, MusicPlayer
 from discord import Member
+from db import handle
 
 def validate_command_invoker(ctx):
     return ctx.author.voice.channel is not None
@@ -29,14 +30,20 @@ class Music(commands.Cog):
             await ctx.author.voice.channel.connect()
 
         await ctx.send(embed=get_queue_embed(keyword))
-            
-        if ctx.guild.id not in players:
-            print('No guild player, creating one..')
-            players[ctx.guild.id] = MusicPlayer(self.bot)
+        if not self.player_manager.is_guild_player_registered(ctx.guild.id):
+            self.player_manager.register_guild_player(ctx.guild.id, MusicPlayer(self.bot))
 
-        print('Guild player found, getting the player...')
-        guild_player = players[ctx.guild.id]
-        guild_player.add_track(ctx, keyword)
+        self.player_manager.get_guild_player(ctx.guild.id) \
+            .add_track(ctx, keyword)
+
+    @commands.command()
+    async def save(self, ctx: Context) -> None:
+        serialized_obj = self.player_manager.get_current_song(ctx.guild.id).get_serialized_format()
+        handle.cursor() \
+            .execute(
+                f'INSERT INTO {ctx.guild.id} VALUES ()'
+            )
+        handle.commit()
 
     @commands.command()
     async def skip(self, ctx: Context):
@@ -78,14 +85,6 @@ class Music(commands.Cog):
     @commands.command()
     async def debug(self, ctx: Context):
         self.player_manager.print_players_DEBUG()
-
-    @commands.command()
-    async def chat(self, ctx: Context, *, message):
-        pass
-
-    @commands.command()
-    async def recommend_movie(self, ctx: Context, *, keywords): 
-        pass
 
 async def setup(bot):
     await bot.add_cog(Music(bot))

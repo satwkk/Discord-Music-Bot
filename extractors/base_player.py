@@ -26,3 +26,7 @@ class Player(ABC):
     @abstractmethod
     def extract_track(self, keyword) -> Union[Track, Dict[str, str]]:
         print ('Base class extract_track called !!!')
+    
+    def is_playlist(self, response_data) -> bool:
+        return isinstance(response_data, dict)
+    

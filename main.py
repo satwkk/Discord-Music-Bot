@@ -22,9 +22,9 @@ class MrBeat(commands.Bot):
         print(f'Bot Latency: {self.latency}')
         print("Bot ready ... ")
 
-    async def on_command_error(self, context, exception):
-        print(context.message)
-        print(str(exception))
+    #async def on_command_error(self, context, exception):
+    #    print(context.message)
+    #    print(str(exception))
 
 async def main():
     bot = MrBeat()
