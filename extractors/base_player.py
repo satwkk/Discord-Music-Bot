@@ -4,7 +4,7 @@ from models.track import Track
 from typing import Union, Dict, List
 from abc import ABC, abstractmethod
 
-YOUTUBEDL_PARAMS = {'format': 'bestaudio/best', 'noplaylist':'True', 'quiet': 'True', 'ignoreerrors': 'True'}
+YOUTUBEDL_PARAMS = {'format': 'bestaudio/best', 'noplaylist':'True', 'quiet': 'True', 'ignoreerrors': 'True', 'audio-quality': '0'}
 YTDL_SEARCH_QUERY = "https://www.youtube.com/watch?v={}"
 
 # Initializing youtube_dl client

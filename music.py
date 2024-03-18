@@ -84,6 +84,7 @@ class Music(commands.Cog):
         
     @commands.command()
     async def debug(self, ctx: Context):
+        print(self.player_manager.get_guild_queue(ctx.guild.id))
         self.player_manager.print_players_DEBUG()
 
 async def setup(bot):

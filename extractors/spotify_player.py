@@ -1,4 +1,7 @@
 import os
+from typing import Dict, Union
+from models.track import Track
+from typing import List
 import utils
 import spotipy as sp
 
@@ -63,3 +66,20 @@ class SpotifyPlaylistPlayer(Player):
 class SpotifyAlbumPlayer(Player):
     def __init__(self):
         super().__init__()
+        
+    def extract_track(self, url: str) -> List[Track]:
+        tracks = list()
+        album = sp_client.album_tracks(utils.get_id(url))
+        
+        for item in album['items']:
+            try:
+                artist = ", ".join([a['name'] for a in item['artists']])
+                song = item['name']
+                tracks.append(Track(artist, song))
+            except Exception as e:
+                print('[SpotifyAlbumPlayer]: ', str(e))
+                continue
+        return tracks
+        
+        
+        

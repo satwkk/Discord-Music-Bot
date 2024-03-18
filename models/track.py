@@ -5,10 +5,16 @@ from db import handle
 
 @dataclass
 class Track:
-    stream_url: str
-    author: str
-    thumbnail: str
-    title: str
+    stream_url: str = None
+    author: str = None
+    thumbnail: str = None
+    title: str = None
+    
+    def __init__(self, author, title, stream_url=None, thumbnail=None):
+        self.author = author
+        self.title = title
+        self.stream_url = stream_url
+        self.thumbnail = thumbnail
     
     def __repr__(self) -> str:
         return f'{self.title} from author {self.author}'
