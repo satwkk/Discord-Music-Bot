@@ -10,21 +10,25 @@ TOKEN = os.getenv("TOKEN")
 
 cogs = ['music']
 
-
 class MrBeat(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
+        '''
+        intents.polls = True
+        intents.dm_polls = True
+        intents.guild_polls = True
+        '''
         super().__init__(command_prefix='-', intents=intents)
 
     async def on_ready(self):
         print(f'Bot Latency: {self.latency}')
         print("Bot ready ... ")
 
-    #async def on_command_error(self, context, exception):
-    #    print(context.message)
-    #    print(str(exception))
+    async def on_command_error(self, context, exception):
+        print(context.message)
+        print(str(exception))
 
 async def main():
     bot = MrBeat()

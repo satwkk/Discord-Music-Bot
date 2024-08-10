@@ -1,21 +1,26 @@
-from discord.ext import commands
-from discord.ext.commands import Bot, Context
-from player import MusicPlayerManager
-from embeds import get_queue_embed
-from player import players, MusicPlayer
-from discord import Member
 from db import handle
+from typing import List
+from dotenv import load_dotenv
+from discord.ext import commands
+from embeds import get_queue_embed
+from models.pollanswer import Answer
+from player import MusicPlayerManager
+from player import players, MusicPlayer
+from discord.ext.commands import Bot, Context
+from discord import Member, Poll, PollAnswer, PollMedia, Message, VoiceChannel
 
-def validate_command_invoker(ctx):
+import datetime
+import math
+import os
+
+load_dotenv()
+DEV_ID = int(os.getenv('DEV_ID'))
+
+def validate_command_invoker(ctx: Context):
     return ctx.author.voice.channel is not None
 
-def author_callable(func):
-    def wrapper(*args, **kwargs):
-        ctx = args[1]
-        if ctx.message.author.id != '':
-            return ctx.send('You cannot invoke this command')
-        func(*args, **kwargs)
-    return wrapper
+def admin_callable(ctx: Context):
+    return ctx.message.author.id == DEV_ID or ctx.message.author.id == ctx.guild.owner_id
 
 # Main music COG that manages all audio related commands
 class Music(commands.Cog):
@@ -47,7 +52,46 @@ class Music(commands.Cog):
 
     @commands.command()
     async def skip(self, ctx: Context):
+        if len(self.player_manager.get_guild_queue(ctx.guild.id)) == 0:
+            await ctx.send('No messages in queue')
+            return
+
+        media = PollMedia(text="Do you want to skip the current song")
+        poll = Poll(media, duration=datetime.timedelta(hours=1))
+        poll.add_answer(text="Yes👍")
+        poll.add_answer(text="No 👎")
+        await ctx.send(poll=poll)
+
+    @commands.command()
+    @commands.check(admin_callable)
+    async def skip_admin(self, ctx: Context):
         self.player_manager.skip_guild_track(ctx.guild.id)
+
+    @commands.Cog.listener()
+    async def on_poll_vote_add(self, user: Member, answer: PollAnswer):
+        try:
+            n = len(user.voice.channel.members)
+            n = math.ceil(n/2)
+
+            # If the number of votes are greater than half of users
+            if answer.poll.total_votes == n:
+                await answer.poll.end()
+
+                answers: List[PollAnswer] = answer.poll.answers
+
+                yes = answers[0]
+                no = answers[1]
+                # default_answer = no
+
+                if yes.vote_count > no.vote_count:
+                    self.player_manager.skip_guild_track(user.guild.id)
+                else:
+                    await answer.poll.message.channel.send("Cannot skip the track.")
+        except Exception as e:
+            print(str(e))
+
+    @commands.Cog.listener()
+    async def on_poll_vote_remove(self, user: Member, answer: PollAnswer): ...
     
     @commands.command()
     async def pause(self, ctx: Context):
@@ -59,8 +103,10 @@ class Music(commands.Cog):
         
     @commands.command()
     async def repeat(self, ctx: Context) -> None:
-        if self.player_manager.register_repeat_request(ctx.guild.id): await ctx.send('Repeat request has been queued.')
-        else: await ctx.send('Play a song to send repeat request.')
+        if self.player_manager.register_repeat_request(ctx.guild.id): 
+            await ctx.send('Repeat request has been queued.')
+        else: 
+            await ctx.send('Play a song to send repeat request.')
 
     @commands.command()
     async def reset(self, ctx: Context) -> None:

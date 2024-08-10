@@ -178,6 +178,8 @@ class MusicPlayer:
             if self.has_song_in_queue() and self._state == PlayerState.IDLE:
                 try:
                     requested_track: PlayerTrack = self.dequeue_track()
+                    print(f"Song streaming url: {requested_track.track.stream_url}")
+                    print(f"Audio Stream: {requested_track.audio_stream.__str__()}")
                     self.voice_client.play(requested_track.audio_stream, after=lambda e: self.reset_state())
                     self.bot.loop.create_task(self.ctx.send(embed=get_music_embed(requested_track.track)))
                     self._state = PlayerState.PLAYING

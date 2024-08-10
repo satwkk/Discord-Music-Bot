@@ -1,4 +1,4 @@
-from youtube_dl import YoutubeDL
+from youtube_dl.youtube_dl import YoutubeDL
 
 from models.track import Track
 from typing import Union, Dict, List
